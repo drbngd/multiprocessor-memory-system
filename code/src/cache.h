@@ -16,10 +16,35 @@
 ///////////////////////////////////////////////////////////////////////////////
 //                                 CONSTANTS                                 //
 ///////////////////////////////////////////////////////////////////////////////
+/** Whether a cache access is a hit or a miss. */
+typedef enum CacheResultEnum
+{
+    HIT = 1,  // The access hit the cache.
+    MISS = 0, // The access missed the cache.
+} CacheResult;
+
+/** Possible replacement policies for the cache. */
+typedef enum ReplacementPolicyEnum
+{
+    LRU = 0,    // Evict the least recently used line.
+    RANDOM = 1, // Evict a random line.
+
+    /**
+     * Evict according to a static way partitioning policy.
+     * Part E asks you to implement this policy for extra credit.
+     */
+    SWP = 2,
+
+    /**
+     * Evict according to a dynamic way partitioning policy.
+     * Part F asks you to implement this policy for extra credit.
+     */
+    DWP = 3,
+} ReplacementPolicy;
 
 /**
  * The maximum allowed number of ways in a cache set.
- * 
+ *
  * At runtime, the actual number of ways in each cache set is guaranteed to be
  * less than or equal to this value.
  */
@@ -31,12 +56,50 @@
 
 // TODO: Define any other data structures you need here.
 // Refer to Appendix A for details on data structures you will need here.
+/* A cache line module */
+typedef struct CacheLine
+{
+    unsigned int valid;
+    unsigned int dirty;
+    unsigned int tag;
+    unsigned int core_id;
+    unsigned long long last_access_time;
+
+} CacheLine;
+
+/** A single cache set. */
+typedef struct CacheSet
+{
+    CacheLine ways[MAX_WAYS_PER_CACHE_SET];
+
+} CacheSet;
 
 /** A single cache module. */
 typedef struct Cache
 {
     // TODO: Define any other fields you need here.
     // Refer to Appendix A for details on other fields you will need here.
+
+    /* number of sets in the cache */
+    unsigned int num_sets;
+
+    /* number of ways in each cache set */
+    unsigned int num_ways;
+
+    /* line size of the cache in Bytes */
+    unsigned int line_size;
+
+    /* size of the cache in Bytes */
+    unsigned int size;
+
+    /* replacement policy being used */
+    ReplacementPolicy replacement_policy;
+
+    /* the cache */
+    CacheSet *sets;
+
+    /* the last evicted line from the cache */
+    CacheLine last_evicted_line;
 
     /**
      * The total number of times this cache was accessed for a read.
@@ -69,31 +132,6 @@ typedef struct Cache
     unsigned long long stat_dirty_evicts;
 } Cache;
 
-/** Whether a cache access is a hit or a miss. */
-typedef enum CacheResultEnum
-{
-    HIT = 1,  // The access hit the cache.
-    MISS = 0, // The access missed the cache.
-} CacheResult;
-
-/** Possible replacement policies for the cache. */
-typedef enum ReplacementPolicyEnum
-{
-    LRU = 0,    // Evict the least recently used line.
-    RANDOM = 1, // Evict a random line.
-
-    /**
-     * Evict according to a static way partitioning policy.
-     * Part E asks you to implement this policy for extra credit.
-     */
-    SWP = 2,
-
-    /**
-     * Evict according to a dynamic way partitioning policy.
-     * Part F asks you to implement this policy for extra credit.
-     */
-    DWP = 3,
-} ReplacementPolicy;
 
 ///////////////////////////////////////////////////////////////////////////////
 //                            FUNCTION PROTOTYPES                            //
@@ -112,7 +150,7 @@ typedef enum ReplacementPolicyEnum
 
 /**
  * Allocate and initialize a cache.
- * 
+ *
  * This is intended to be implemented in part A.
  *
  * @param size The size of the cache in bytes.
@@ -126,11 +164,11 @@ Cache *cache_new(uint64_t size, uint64_t associativity, uint64_t line_size,
 
 /**
  * Access the cache at the given address.
- * 
+ *
  * Also update the cache statistics accordingly.
- * 
+ *
  * This is intended to be implemented in part A.
- * 
+ *
  * @param c The cache to access.
  * @param line_addr The address of the cache line to access (in units of the
  *                  cache line size, i.e., excluding the line offset bits).
@@ -143,11 +181,11 @@ CacheResult cache_access(Cache *c, uint64_t line_addr, bool is_write,
 
 /**
  * Install the cache line with the given address.
- * 
+ *
  * Also update the cache statistics accordingly.
- * 
+ *
  * This is intended to be implemented in part A.
- * 
+ *
  * @param c The cache to install the line into.
  * @param line_addr The address of the cache line to install (in units of the
  *                  cache line size, i.e., excluding the line offset bits).
@@ -161,13 +199,13 @@ void cache_install(Cache *c, uint64_t line_addr, bool is_write,
  * Find which way in a given cache set to replace when a new cache line needs
  * to be installed. This should be chosen according to the cache's replacement
  * policy.
- * 
+ *
  * The returned victim can be valid (non-empty), in which case the calling
  * function is responsible for evicting the cache line from that victim way.
- * 
+ *
  * This is intended to be initially implemented in part A and, for extra
  * credit, extended in parts E and F.
- * 
+ *
  * @param c The cache to search.
  * @param set_index The index of the cache set to search.
  * @param core_id The CPU core ID that requested this access.
@@ -178,9 +216,9 @@ unsigned int cache_find_victim(Cache *c, unsigned int set_index,
 
 /**
  * Print the statistics of the given cache.
- * 
+ *
  * This is implemented for you. You must not modify its output format.
- * 
+ *
  * @param c The cache to print the statistics of.
  * @param label A label for the cache, which is used as a prefix for each
  *              statistic.

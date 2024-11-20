@@ -269,16 +269,63 @@ uint64_t memsys_access_modeBC(MemorySystem *sys, uint64_t line_addr,
     if (type == ACCESS_TYPE_IFETCH)
     {
         // TODO: Simulate the instruction fetch and update delay accordingly.
+        /* first access L1 */
+        delay += ICACHE_HIT_LATENCY;
+       if (cache_access(sys->icache, line_addr, false, core_id)){
+           return delay;
+       }
+
+        /* if not in L1 -> check in L2 */
+        delay += L2CACHE_HIT_LATENCY;
+        if (cache_access(sys->l2cache, line_addr, false, core_id)) {
+            return delay;
+        }
+
+        /* if not in L2 -> search in DRAM */
+        delay += dram_access(sys->dram, line_addr, false);
+        return delay;
+
     }
 
     if (type == ACCESS_TYPE_LOAD)
     {
         // TODO: Simulate the data load and update delay accordingly.
+        /* first access L1 */
+        delay += DCACHE_HIT_LATENCY;
+        if (cache_access(sys->dcache, line_addr, false, core_id)){
+            return delay;
+        }
+
+        /* if not in L1 -> check in L2 */
+        delay += L2CACHE_HIT_LATENCY;
+        if (cache_access(sys->l2cache, line_addr, false, core_id)) {
+            return delay;
+        }
+
+        /* if not in L2 -> search in DRAM */
+        delay += dram_access(sys->dram, line_addr, false);
+        return delay;
+
     }
 
     if (type == ACCESS_TYPE_STORE)
     {
         // TODO: Simulate the data store and update delay accordingly.
+        /* first access L1 */
+        delay += ICACHE_HIT_LATENCY;
+        if (cache_access(sys->dcache, line_addr, true, core_id)){
+            return delay;
+        }
+
+        /* if not in L1 -> check in L2 */
+        delay += L2CACHE_HIT_LATENCY;
+        if (cache_access(sys->l2cache, line_addr, true, core_id)) {
+            return delay;
+        }
+
+        /* if not in L2 -> search in DRAM */
+        delay += dram_access(sys->dram, line_addr, true);
+        return delay;
     }
 
     return delay;
@@ -306,11 +353,19 @@ uint64_t memsys_l2_access(MemorySystem *sys, uint64_t line_addr,
     uint64_t delay = L2CACHE_HIT_LATENCY;
 
     // TODO: Perform the L2 cache access.
-
     // TODO: Use the dram_access() function to get the delay of an L2 miss.
     // TODO: Use the dram_access() function to perform writebacks to memory.
     //       Note that writebacks are done off the critical path.
     // This will help us track your memory reads and memory writes.
+
+    /* L2 Miss */
+    if (cache_access(sys->l2cache, line_addr, is_writeback, core_id) == MISS) {
+        delay += dram_access(sys->dram, line_addr, is_writeback);
+    }
+
+    if (is_writeback) {
+        dram_access(sys->dram, line_addr, is_writeback);
+    }
 
     return delay;
 }

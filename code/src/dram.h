@@ -20,11 +20,24 @@
 // TODO: Define any other data structures you need here.
 // Refer to Appendix B for details on data structures you will need here.
 
+/* A Row-buffer module */
+typedef struct RowBuffer
+{
+    /* valid bit */
+    unsigned int valid;
+
+    /* row id */
+    unsigned int row_id;
+} RowBuffer;
+
 /** A DRAM module. */
 typedef struct DRAM
 {
     // TODO: Define any other fields you need here.
     // Refer to Appendix B for details on other fields you will need here.
+
+    /* array of row buffers */
+
 
     /**
      * The total number of times DRAM was accessed for a read.

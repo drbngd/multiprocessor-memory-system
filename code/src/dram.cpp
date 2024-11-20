@@ -80,7 +80,9 @@ DRAM *dram_new()
     // TODO: Allocate memory to the data structures and initialize the required
     //       fields. (You might want to use calloc() for this.)
 
-    return NULL; // to suppress warning
+    DRAM *dram = (DRAM *)calloc(1, sizeof(DRAM));
+
+    return dram; // to suppress warning
 }
 
 /**
@@ -106,7 +108,11 @@ uint64_t dram_access(DRAM *dram, uint64_t line_addr, bool is_dram_write)
     // TODO: Call the dram_access_mode_CDEF() function as needed.
     // TODO: Return the delay in cycles incurred by this DRAM access.
 
-    return 0; // to suppress warning
+    dram->stat_read_access += !is_dram_write;
+    dram->stat_write_access += is_dram_write;
+
+
+    return DELAY_SIM_MODE_B;
 }
 
 /**
