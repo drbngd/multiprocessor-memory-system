@@ -310,6 +310,7 @@ uint64_t memsys_access_modeBC(MemorySystem *sys, uint64_t line_addr,
         if (outcome == MISS) {
             /* access L2 & update delay */
             delay += memsys_l2_access(sys, line_addr, false, core_id);
+
             /* bring line in DCACHE */
             cache_install(sys->dcache, line_addr, is_write, core_id);
 
@@ -317,9 +318,13 @@ uint64_t memsys_access_modeBC(MemorySystem *sys, uint64_t line_addr,
 
             /* check if evicted line was dirty -> perform writeback */
             if (sys->dcache->last_evicted_line.valid && sys->dcache->last_evicted_line.dirty) {
+                /* get to-be evicted line's addr */
                 uint64_t evicted_line_addr = sys->dcache->last_evicted_line.line_addr;
-                /*delay += */memsys_l2_access(sys, evicted_line_addr, true, core_id);
 
+                /* delay not be calculated for writeback */
+                memsys_l2_access(sys, evicted_line_addr, true, core_id);
+
+                /* make the data in last evicted line invalid */
                 sys->dcache->last_evicted_line.valid = false;
             }
         }
