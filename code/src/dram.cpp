@@ -109,18 +109,23 @@ uint64_t dram_access(DRAM *dram, uint64_t line_addr, bool is_dram_write)
     // TODO: Return the delay in cycles incurred by this DRAM access.
 
 
+    if (SIM_MODE ==  SIM_MODE_B) {
+        if (is_dram_write)
+        {
+            dram->stat_write_access += 1;
+            dram->stat_write_delay += DELAY_SIM_MODE_B;
+        } else {
+            dram->stat_read_access += 1;
+            dram->stat_read_delay += DELAY_SIM_MODE_B;
+        }
 
-    if (is_dram_write)
-    {
-        dram->stat_write_access += 1;
-        dram->stat_write_delay += DELAY_SIM_MODE_B;
-    } else {
-        dram->stat_read_access += 1;
-        dram->stat_read_delay += DELAY_SIM_MODE_B;
+        return DELAY_SIM_MODE_B;
     }
 
+    /* writing code for parts CDEF */
+    return dram_access_mode_CDEF(dram, line_addr, is_dram_write);
 
-    return DELAY_SIM_MODE_B;
+
 }
 
 /**
@@ -147,6 +152,68 @@ uint64_t dram_access_mode_CDEF(DRAM *dram, uint64_t line_addr,
     // row buffers in consecutive rows.
     // TODO: Use this function to track open rows.
     // TODO: Compute the delay based on row buffer hit/miss/empty.
+
+    uint64_t physical_addr = line_addr * CACHE_LINESIZE;
+    uint64_t bank = (physical_addr/ROW_BUFFER_SIZE) % NUM_BANKS;
+    uint64_t row_index = (physical_addr/ROW_BUFFER_SIZE) / NUM_BANKS;
+
+
+    if (DRAM_PAGE_POLICY == CLOSE_PAGE) {
+        if (is_dram_write)
+        {
+            dram->stat_write_access += 1;
+            dram->stat_write_delay += DELAY_ACT + DELAY_CAS + DELAY_BUS;
+        } else {
+            dram->stat_read_access += 1;
+            dram->stat_read_delay += DELAY_ACT + DELAY_CAS + DELAY_BUS;
+        }
+
+        return DELAY_ACT + DELAY_CAS + DELAY_BUS;
+
+    }
+
+    if (DRAM_PAGE_POLICY == OPEN_PAGE) {
+        if (dram->row_buffers[bank].valid && (dram->row_buffers[bank].row_id == row_index)) {
+            if (is_dram_write)
+            {
+                dram->stat_write_access += 1;
+                dram->stat_write_delay += DELAY_CAS + DELAY_BUS;
+            } else {
+                dram->stat_read_access += 1;
+                dram->stat_read_delay += DELAY_CAS + DELAY_BUS;
+            }
+
+            return DELAY_CAS + DELAY_BUS;
+        } else if (!dram->row_buffers[bank].valid) {
+            if (is_dram_write)
+            {
+                dram->stat_write_access += 1;
+                dram->stat_write_delay += DELAY_ACT + DELAY_CAS + DELAY_BUS;
+            } else {
+                dram->stat_read_access += 1;
+                dram->stat_read_delay += DELAY_ACT + DELAY_CAS + DELAY_BUS;
+            }
+
+            dram->row_buffers[bank].row_id = row_index;
+            dram->row_buffers[bank].valid = true;
+            return DELAY_ACT + DELAY_CAS + DELAY_BUS;
+        } else if ( dram->row_buffers[bank].valid && (dram->row_buffers[bank].row_id != row_index)){
+            if (is_dram_write)
+            {
+                dram->stat_write_access += 1;
+                dram->stat_write_delay += DELAY_ACT + DELAY_CAS + DELAY_PRE + DELAY_BUS;
+            } else {
+                dram->stat_read_access += 1;
+                dram->stat_read_delay += DELAY_ACT + DELAY_CAS + DELAY_PRE + DELAY_BUS;
+            }
+
+            dram->row_buffers[bank].row_id = row_index;
+            dram->row_buffers[bank].valid = true;
+            return DELAY_ACT + DELAY_CAS + DELAY_PRE + DELAY_BUS;
+        }
+
+    }
+
 
     return 0; // to suppress warning
 }
