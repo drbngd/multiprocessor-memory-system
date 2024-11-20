@@ -108,8 +108,16 @@ uint64_t dram_access(DRAM *dram, uint64_t line_addr, bool is_dram_write)
     // TODO: Call the dram_access_mode_CDEF() function as needed.
     // TODO: Return the delay in cycles incurred by this DRAM access.
 
-    dram->stat_read_access += !is_dram_write;
-    dram->stat_write_access += is_dram_write;
+
+
+    if (is_dram_write)
+    {
+        dram->stat_write_access += 1;
+        dram->stat_write_delay += DELAY_SIM_MODE_B;
+    } else {
+        dram->stat_read_access += 1;
+        dram->stat_read_delay += DELAY_SIM_MODE_B;
+    }
 
 
     return DELAY_SIM_MODE_B;

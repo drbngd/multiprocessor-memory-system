@@ -187,6 +187,7 @@ void cache_install(Cache *c, uint64_t line_addr, bool is_write,
     victim->valid = true;
     victim->dirty = is_write;
     victim->tag = tag;
+    victim->line_addr = line_addr;
     victim->core_id = core_id;
     victim->last_access_time = current_cycle;
 

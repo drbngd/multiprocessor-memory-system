@@ -61,9 +61,10 @@ typedef struct CacheLine
 {
     unsigned int valid;
     unsigned int dirty;
-    unsigned int tag;
+    uint64_t line_addr;
+    uint64_t tag;
     unsigned int core_id;
-    unsigned long long last_access_time;
+    uint64_t last_access_time;
 
 } CacheLine;
 

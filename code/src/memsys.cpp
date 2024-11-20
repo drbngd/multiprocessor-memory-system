@@ -264,68 +264,65 @@ uint64_t memsys_access_modeA(MemorySystem *sys, uint64_t line_addr,
 uint64_t memsys_access_modeBC(MemorySystem *sys, uint64_t line_addr,
                               AccessType type, unsigned int core_id)
 {
+
     uint64_t delay = 0;
+
+    bool needs_icache_access = false;
+    bool needs_dcache_access = false;
+    bool is_write = false;
 
     if (type == ACCESS_TYPE_IFETCH)
     {
         // TODO: Simulate the instruction fetch and update delay accordingly.
-        /* first access L1 */
-        delay += ICACHE_HIT_LATENCY;
-       if (cache_access(sys->icache, line_addr, false, core_id)){
-           return delay;
-       }
-
-        /* if not in L1 -> check in L2 */
-        delay += L2CACHE_HIT_LATENCY;
-        if (cache_access(sys->l2cache, line_addr, false, core_id)) {
-            return delay;
-        }
-
-        /* if not in L2 -> search in DRAM */
-        delay += dram_access(sys->dram, line_addr, false);
-        return delay;
-
+        needs_icache_access = true;
     }
 
     if (type == ACCESS_TYPE_LOAD)
     {
         // TODO: Simulate the data load and update delay accordingly.
-        /* first access L1 */
-        delay += DCACHE_HIT_LATENCY;
-        if (cache_access(sys->dcache, line_addr, false, core_id)){
-            return delay;
-        }
-
-        /* if not in L1 -> check in L2 */
-        delay += L2CACHE_HIT_LATENCY;
-        if (cache_access(sys->l2cache, line_addr, false, core_id)) {
-            return delay;
-        }
-
-        /* if not in L2 -> search in DRAM */
-        delay += dram_access(sys->dram, line_addr, false);
-        return delay;
-
+        needs_dcache_access = true;
     }
 
     if (type == ACCESS_TYPE_STORE)
     {
         // TODO: Simulate the data store and update delay accordingly.
-        /* first access L1 */
+        needs_dcache_access = true;
+        is_write = true;
+    }
+
+    if (needs_icache_access)
+    {
         delay += ICACHE_HIT_LATENCY;
-        if (cache_access(sys->dcache, line_addr, true, core_id)){
-            return delay;
+        CacheResult outcome = cache_access(sys->icache, line_addr, is_write, core_id);
+        if (outcome == MISS) {
+            /* access L2 & update delay */
+            delay += memsys_l2_access(sys, line_addr, false, core_id);
+            /* bring line in ICACHE */
+            cache_install(sys->icache, line_addr, is_write, core_id);
         }
 
-        /* if not in L1 -> check in L2 */
-        delay += L2CACHE_HIT_LATENCY;
-        if (cache_access(sys->l2cache, line_addr, true, core_id)) {
-            return delay;
-        }
+    }
 
-        /* if not in L2 -> search in DRAM */
-        delay += dram_access(sys->dram, line_addr, true);
-        return delay;
+    if (needs_dcache_access)
+    {
+        delay += DCACHE_HIT_LATENCY;
+        CacheResult outcome = cache_access(sys->dcache, line_addr, is_write, core_id);
+        if (outcome == MISS) {
+            /* access L2 & update delay */
+            delay += memsys_l2_access(sys, line_addr, false, core_id);
+            /* bring line in DCACHE */
+            cache_install(sys->dcache, line_addr, is_write, core_id);
+
+
+
+            /* check if evicted line was dirty -> perform writeback */
+            if (sys->dcache->last_evicted_line.valid && sys->dcache->last_evicted_line.dirty) {
+                uint64_t evicted_line_addr = sys->dcache->last_evicted_line.line_addr;
+                /*delay += */memsys_l2_access(sys, evicted_line_addr, true, core_id);
+
+                sys->dcache->last_evicted_line.valid = false;
+            }
+        }
     }
 
     return delay;
@@ -358,13 +355,30 @@ uint64_t memsys_l2_access(MemorySystem *sys, uint64_t line_addr,
     //       Note that writebacks are done off the critical path.
     // This will help us track your memory reads and memory writes.
 
-    /* L2 Miss */
-    if (cache_access(sys->l2cache, line_addr, is_writeback, core_id) == MISS) {
-        delay += dram_access(sys->dram, line_addr, is_writeback);
+    CacheResult outcome = cache_access(sys->l2cache, line_addr, is_writeback, core_id);
+
+    if (outcome == HIT) {
+        return delay;
     }
 
-    if (is_writeback) {
-        dram_access(sys->dram, line_addr, is_writeback);
+    if (outcome == MISS) {
+        /* access DRAM */
+        delay += dram_access(sys->dram, line_addr, is_writeback);
+
+        /* bring line in L2 */
+        cache_install(sys->l2cache, line_addr, is_writeback, core_id);
+
+        /* check for writeback & perform if necessary */
+        if (sys->l2cache->last_evicted_line.valid && sys->l2cache->last_evicted_line.dirty) {
+            /* get evicted line's addr */
+            uint64_t evicted_line_addr = sys->l2cache->last_evicted_line.line_addr;
+
+            /* writeback to dram */
+            /*delay += */dram_access(sys->dram, evicted_line_addr, true);
+
+            /* make the data in last evicted line invalid */
+            sys->l2cache->last_evicted_line.valid = false;
+        }
     }
 
     return delay;
