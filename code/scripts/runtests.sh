@@ -27,9 +27,9 @@ for reference_results in ../ref/results/*.res; do
         C.S1MB.OP.*)
             test_args=(-mode 3 -L2sizeKB 1024 -dram_policy 0 "../traces/${test_name#C.S1MB.OP.}.mtr.gz")
             ;;
-#        C.S1MB.CP.*)
-#            test_args=(-mode 3 -L2sizeKB 1024 -dram_policy 1 "../traces/${test_name#C.S1MB.CP.}.mtr.gz")
-#            ;;
+        C.S1MB.CP.*)
+            test_args=(-mode 3 -L2sizeKB 1024 -dram_policy 1 "../traces/${test_name#C.S1MB.CP.}.mtr.gz")
+            ;;
         D.mix1)
             test_args=(-mode 4 ../traces/bzip2.mtr.gz ../traces/libq.mtr.gz)
             ;;

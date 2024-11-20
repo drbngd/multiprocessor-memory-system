@@ -153,69 +153,85 @@ uint64_t dram_access_mode_CDEF(DRAM *dram, uint64_t line_addr,
     // TODO: Use this function to track open rows.
     // TODO: Compute the delay based on row buffer hit/miss/empty.
 
-    uint64_t physical_addr = line_addr * CACHE_LINESIZE;
-    uint64_t bank = (physical_addr/ROW_BUFFER_SIZE) % NUM_BANKS;
-    uint64_t row_index = (physical_addr/ROW_BUFFER_SIZE) / NUM_BANKS;
-
 
     if (DRAM_PAGE_POLICY == CLOSE_PAGE) {
-        if (is_dram_write)
-        {
+
+        if (is_dram_write) {
+            /* Timing: DELAY_ACT (activate the row) + DELAY_CAS (column access) + DELAY_BUS (data transfer). */
             dram->stat_write_access += 1;
             dram->stat_write_delay += DELAY_ACT + DELAY_CAS + DELAY_BUS;
         } else {
+            /* Timing: DELAY_ACT (activate the row) + DELAY_CAS (column access) + DELAY_BUS (data transfer). */
             dram->stat_read_access += 1;
             dram->stat_read_delay += DELAY_ACT + DELAY_CAS + DELAY_BUS;
         }
 
         return DELAY_ACT + DELAY_CAS + DELAY_BUS;
-
     }
 
+
     if (DRAM_PAGE_POLICY == OPEN_PAGE) {
-        if (dram->row_buffers[bank].valid && (dram->row_buffers[bank].row_id == row_index)) {
-            if (is_dram_write)
-            {
+        /* get physical addr, calculate bank index and row index */
+        uint64_t physical_addr = line_addr * CACHE_LINESIZE;
+        uint64_t bank = (physical_addr/ROW_BUFFER_SIZE) % NUM_BANKS;
+        uint64_t row_index = (physical_addr/ROW_BUFFER_SIZE) / NUM_BANKS;
+
+        /* get bool conditions for row hit/miss/empty */
+        bool is_row_hit = dram->row_buffers[bank].valid && (dram->row_buffers[bank].row_id == row_index);
+        bool is_row_miss = dram->row_buffers[bank].valid && (dram->row_buffers[bank].row_id != row_index);
+        bool is_row_empty = !dram->row_buffers[bank].valid;
+
+
+        if (is_row_hit) {
+             /* Row hit: The desired row is already open in the row buffer.
+              * Timing: DELAY_CAS (column access) + DELAY_BUS (data transfer). */
+            if (is_dram_write) {
                 dram->stat_write_access += 1;
                 dram->stat_write_delay += DELAY_CAS + DELAY_BUS;
             } else {
                 dram->stat_read_access += 1;
                 dram->stat_read_delay += DELAY_CAS + DELAY_BUS;
             }
-
             return DELAY_CAS + DELAY_BUS;
-        } else if (!dram->row_buffers[bank].valid) {
-            if (is_dram_write)
-            {
+        }
+
+        if (is_row_empty) {
+             /* Row empty: No row is currently open in the row buffer.
+              * Timing: DELAY_ACT (row activation) + DELAY_CAS (column access) + DELAY_BUS (data transfer). */
+            if (is_dram_write) {
                 dram->stat_write_access += 1;
                 dram->stat_write_delay += DELAY_ACT + DELAY_CAS + DELAY_BUS;
             } else {
                 dram->stat_read_access += 1;
                 dram->stat_read_delay += DELAY_ACT + DELAY_CAS + DELAY_BUS;
             }
-
-            dram->row_buffers[bank].row_id = row_index;
+            dram->row_buffers[bank].row_id = row_index;  // Activate the new row.
             dram->row_buffers[bank].valid = true;
             return DELAY_ACT + DELAY_CAS + DELAY_BUS;
-        } else if ( dram->row_buffers[bank].valid && (dram->row_buffers[bank].row_id != row_index)){
-            if (is_dram_write)
-            {
+        }
+
+        if (is_row_miss) {
+            /* Row miss: A different row is currently open in the row buffer.
+             * Timing: DELAY_PRE (precharge current row) + DELAY_ACT (activate new row) +
+             * DELAY_CAS (column access) + DELAY_BUS (data transfer). */
+            if (is_dram_write) {
                 dram->stat_write_access += 1;
-                dram->stat_write_delay += DELAY_ACT + DELAY_CAS + DELAY_PRE + DELAY_BUS;
+                dram->stat_write_delay += DELAY_PRE + DELAY_ACT + DELAY_CAS + DELAY_BUS;
             } else {
                 dram->stat_read_access += 1;
-                dram->stat_read_delay += DELAY_ACT + DELAY_CAS + DELAY_PRE + DELAY_BUS;
+                dram->stat_read_delay += DELAY_PRE + DELAY_ACT + DELAY_CAS + DELAY_BUS;
             }
 
+            /* add the recently accessed row to row-buffer */
             dram->row_buffers[bank].row_id = row_index;
             dram->row_buffers[bank].valid = true;
-            return DELAY_ACT + DELAY_CAS + DELAY_PRE + DELAY_BUS;
+            return DELAY_PRE + DELAY_ACT + DELAY_CAS + DELAY_BUS;
         }
+
 
     }
 
-
-    return 0; // to suppress warning
+    return 0;
 }
 
 /**
