@@ -368,7 +368,7 @@ uint64_t memsys_l2_access(MemorySystem *sys, uint64_t line_addr,
 
     if (outcome == MISS) {
         /* access DRAM */
-        delay += dram_access(sys->dram, line_addr, is_writeback);
+        delay += dram_access(sys->dram, line_addr, false);
 
         /* bring line in L2 */
         cache_install(sys->l2cache, line_addr, is_writeback, core_id);
@@ -422,22 +422,169 @@ uint64_t memsys_access_modeDEF(MemorySystem *sys, uint64_t v_line_addr,
     //       4 KB, as indicated by the PAGE_SIZE constant.
     // Note: memsys_convert_vpn_to_pfn() operates at page granularity and
     //       returns a page number.
-    p_line_addr = v_line_addr; // Replace this with a correct implementation.
+
+    /* caches are PIPT */
+    uint64_t v_full_addr = v_line_addr * CACHE_LINESIZE;
+    uint64_t vpn = v_full_addr / PAGE_SIZE;
+    uint64_t ppn = memsys_convert_vpn_to_pfn(sys, vpn, core_id);
+    uint64_t line_addr = (ppn * PAGE_SIZE + v_full_addr % PAGE_SIZE) / CACHE_LINESIZE ;
+
+    bool needs_icache_access = false;
+    bool needs_dcache_access = false;
+    bool is_write = false;
 
     if (type == ACCESS_TYPE_IFETCH)
     {
         // TODO: Simulate the instruction fetch and update delay accordingly.
+        needs_icache_access = true;
     }
 
     if (type == ACCESS_TYPE_LOAD)
     {
         // TODO: Simulate the data load and update delay accordingly.
+        needs_dcache_access = true;
     }
 
     if (type == ACCESS_TYPE_STORE)
     {
         // TODO: Simulate the data store and update delay accordingly.
+        needs_dcache_access = true;
+        is_write = true;
     }
+
+    if (needs_icache_access)
+    {
+        delay += ICACHE_HIT_LATENCY;
+        CacheResult outcome = cache_access(sys->icache_coreid[core_id], line_addr, is_write, core_id);
+        if (outcome == MISS) {
+            /* access L2 & update delay */
+            delay += memsys_l2_access(sys, line_addr, false, core_id);
+            /* bring line in ICACHE */
+            cache_install(sys->icache_coreid[core_id], line_addr, is_write, core_id);
+        }
+
+    }
+
+    if (needs_dcache_access)
+    {
+        delay += DCACHE_HIT_LATENCY;
+        CacheResult outcome = cache_access(sys->dcache_coreid[core_id], line_addr, is_write, core_id);
+        if (outcome == MISS) {
+            /* access L2 & update delay */
+            delay += memsys_l2_access(sys, line_addr, false, core_id);
+
+            /* bring line in DCACHE */
+            cache_install(sys->dcache_coreid[core_id], line_addr, is_write, core_id);
+
+
+
+            /* check if evicted line was dirty -> perform writeback */
+            if (sys->dcache_coreid[core_id]->last_evicted_line.valid && sys->dcache_coreid[core_id]->last_evicted_line.dirty) {
+                /* get to-be evicted line's addr */
+                uint64_t evicted_line_addr = sys->dcache_coreid[core_id]->last_evicted_line.line_addr;
+
+                /* delay not be calculated for writeback */
+                memsys_l2_access(sys, evicted_line_addr, true, core_id);
+
+                /* make the data in last evicted line invalid */
+                sys->dcache_coreid[core_id]->last_evicted_line.valid = false;
+            }
+        }
+    }
+
+
+
+
+
+//    bool c0_needs_icache_access = false;
+//    bool c1_needs_icache_access = false;
+//    bool c0_needs_dcache_access = false;
+//    bool c1_needs_dcache_access = false;
+////    bool c0_is_write = false;
+////    bool c1_is_write = false;
+//    bool is_write = false;
+//
+//
+//    if (type == ACCESS_TYPE_IFETCH)
+//    {
+//        // TODO: Simulate the instruction fetch and update delay accordingly.
+//        if (core_id == 0) {
+//            c0_needs_icache_access = true;
+//        }
+//        else if (core_id == 1) {
+//            c1_needs_icache_access = true;
+//        }
+//    }
+//
+//    if (type == ACCESS_TYPE_LOAD)
+//    {
+//        // TODO: Simulate the data load and update delay accordingly.
+//        if (core_id == 0) {
+//            c0_needs_dcache_access = true;
+//        }
+//        else if (core_id == 1) {
+//            c1_needs_dcache_access = true;
+//        }
+//    }
+//
+//    if (type == ACCESS_TYPE_STORE)
+//    {
+//        // TODO: Simulate the data store and update delay accordingly.
+//        if (core_id == 0) {
+//            c0_needs_dcache_access = true;
+////            c0_is_write = true;
+//        }
+//        else if (core_id == 1) {
+//            c1_needs_dcache_access = true;
+////            c1_is_write = true;
+//        }
+//        is_write = true;
+//
+//    }
+//
+//    /* accessing core 0's or core 1's icache */
+//    if (c0_needs_icache_access || c1_needs_icache_access) {
+//        delay += ICACHE_HIT_LATENCY;
+//        CacheResult outcome = cache_access(sys->icache_coreid[core_id], p_line_addr, false, core_id);
+//        if (outcome == MISS) {
+//            /* access L2 & update delay */
+//            delay += memsys_l2_access(sys, p_line_addr, false, core_id);
+//            /* bring line in ICACHE */
+//            cache_install(sys->icache_coreid[core_id], p_line_addr, false, core_id);
+//
+//            /* if copy in core 1's icache -> then make it invalid in core 0 - vice versa */
+//            // TODO
+//        }
+//    }
+//
+////    is_write = c0_is_write || c1_is_write;
+//    /* accessing core 0's or core 1's dcache */
+//    if (c0_needs_dcache_access || c1_needs_dcache_access) {
+//        delay += DCACHE_HIT_LATENCY;
+//        CacheResult outcome = cache_access(sys->dcache_coreid[core_id], p_line_addr, is_write, core_id);
+//        if (outcome == MISS) {
+//            /* access L2 & update delay */
+//            delay += memsys_l2_access(sys, p_line_addr, false, core_id);
+//
+//            /* bring line in DCACHE */
+//            cache_install(sys->dcache_coreid[core_id], p_line_addr, is_write, core_id);
+//
+//            /* check if evicted line was dirty -> perform writeback */
+//            if (sys->dcache_coreid[core_id]->last_evicted_line.valid && sys->dcache_coreid[core_id]->last_evicted_line.dirty) {
+//                /* get to-be evicted line's addr */
+//                uint64_t evicted_line_addr = sys->dcache_coreid[core_id]->last_evicted_line.line_addr;
+//
+//                /* delay not be calculated for writeback */
+//                memsys_l2_access(sys, evicted_line_addr, true, core_id);
+//
+//                /* make the data in last evicted line invalid */
+//                sys->dcache_coreid[core_id]->last_evicted_line.valid = false;
+//            }
+//        }
+//    }
+
+
+
 
     return delay;
 }

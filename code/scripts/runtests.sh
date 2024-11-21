@@ -18,12 +18,12 @@ passed_tests=0
 for reference_results in ../ref/results/*.res; do
     test_name="$(basename "$reference_results" .res)"
     case "$test_name" in
-#        A.*)
-#            test_args=(-mode 1 "../traces/${test_name#A.}.mtr.gz")
-#            ;;
-#        B.S1MB.*)
-#            test_args=(-mode 2 -L2sizeKB 1024 "../traces/${test_name#B.S1MB.}.mtr.gz")
-#            ;;
+        A.*)
+            test_args=(-mode 1 "../traces/${test_name#A.}.mtr.gz")
+            ;;
+        B.S1MB.*)
+            test_args=(-mode 2 -L2sizeKB 1024 "../traces/${test_name#B.S1MB.}.mtr.gz")
+            ;;
         C.S1MB.OP.*)
             test_args=(-mode 3 -L2sizeKB 1024 -dram_policy 0 "../traces/${test_name#C.S1MB.OP.}.mtr.gz")
             ;;
@@ -33,15 +33,15 @@ for reference_results in ../ref/results/*.res; do
         D.mix1)
             test_args=(-mode 4 ../traces/bzip2.mtr.gz ../traces/libq.mtr.gz)
             ;;
-        E.Q1.mix1)
-            test_args=(-mode 4 -L2repl 2 -SWP_core0ways 4 ../traces/bzip2.mtr.gz ../traces/libq.mtr.gz)
-            ;;
-        E.Q2.mix1)
-            test_args=(-mode 4 -L2repl 2 -SWP_core0ways 8 ../traces/bzip2.mtr.gz ../traces/libq.mtr.gz)
-            ;;
-        E.Q3.mix1)
-            test_args=(-mode 4 -L2repl 2 -SWP_core0ways 12 ../traces/bzip2.mtr.gz ../traces/libq.mtr.gz)
-            ;;
+#        E.Q1.mix1)
+#            test_args=(-mode 4 -L2repl 2 -SWP_core0ways 4 ../traces/bzip2.mtr.gz ../traces/libq.mtr.gz)
+#            ;;
+#        E.Q2.mix1)
+#            test_args=(-mode 4 -L2repl 2 -SWP_core0ways 8 ../traces/bzip2.mtr.gz ../traces/libq.mtr.gz)
+#            ;;
+#        E.Q3.mix1)
+#            test_args=(-mode 4 -L2repl 2 -SWP_core0ways 12 ../traces/bzip2.mtr.gz ../traces/libq.mtr.gz)
+#            ;;
         *) continue ;;
     esac
 

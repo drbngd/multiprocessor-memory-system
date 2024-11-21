@@ -111,6 +111,8 @@ CacheResult cache_access(Cache *c, uint64_t line_addr, bool is_write,
     unsigned int tag = line_addr / c->num_sets;
     unsigned int set_index = line_addr % c->num_sets;
 
+//    printf("\t\tindex: %d, tag: %d, is_write: %d, core_id: %d\n", set_index, tag, is_write, core_id);
+
     /* index the cache set */
     CacheSet *set = &c->sets[set_index];
 
