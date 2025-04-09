@@ -80,7 +80,9 @@ DRAM *dram_new()
     // TODO: Allocate memory to the data structures and initialize the required
     //       fields. (You might want to use calloc() for this.)
 
-    return NULL; // to suppress warning
+    DRAM *dram = (DRAM *)calloc(1, sizeof(DRAM));
+
+    return dram; // to suppress warning
 }
 
 /**
@@ -106,7 +108,24 @@ uint64_t dram_access(DRAM *dram, uint64_t line_addr, bool is_dram_write)
     // TODO: Call the dram_access_mode_CDEF() function as needed.
     // TODO: Return the delay in cycles incurred by this DRAM access.
 
-    return 0; // to suppress warning
+
+    if (SIM_MODE ==  SIM_MODE_B) {
+        if (is_dram_write)
+        {
+            dram->stat_write_access += 1;
+            dram->stat_write_delay += DELAY_SIM_MODE_B;
+        } else {
+            dram->stat_read_access += 1;
+            dram->stat_read_delay += DELAY_SIM_MODE_B;
+        }
+
+        return DELAY_SIM_MODE_B;
+    }
+
+    /* writing code for parts CDEF */
+    return dram_access_mode_CDEF(dram, line_addr, is_dram_write);
+
+
 }
 
 /**
@@ -134,7 +153,73 @@ uint64_t dram_access_mode_CDEF(DRAM *dram, uint64_t line_addr,
     // TODO: Use this function to track open rows.
     // TODO: Compute the delay based on row buffer hit/miss/empty.
 
-    return 0; // to suppress warning
+
+    if (DRAM_PAGE_POLICY == CLOSE_PAGE) {
+
+        if (is_dram_write) {
+            /* Timing: DELAY_ACT (activate the row) + DELAY_CAS (column access) + DELAY_BUS (data transfer). */
+            dram->stat_write_access += 1;
+            dram->stat_write_delay += DELAY_ACT + DELAY_CAS + DELAY_BUS;
+        } else {
+            /* Timing: DELAY_ACT (activate the row) + DELAY_CAS (column access) + DELAY_BUS (data transfer). */
+            dram->stat_read_access += 1;
+            dram->stat_read_delay += DELAY_ACT + DELAY_CAS + DELAY_BUS;
+        }
+
+        return DELAY_ACT + DELAY_CAS + DELAY_BUS;
+    }
+
+    int delay = 0;
+    if (DRAM_PAGE_POLICY == OPEN_PAGE) {
+        /* get physical addr, calculate bank index and row index */
+        uint64_t physical_addr = line_addr * CACHE_LINESIZE;
+        uint64_t bank = (physical_addr/ROW_BUFFER_SIZE) % NUM_BANKS;
+        uint64_t row_index = (physical_addr/ROW_BUFFER_SIZE) / NUM_BANKS;
+
+        /* get bool conditions for row hit/miss/empty */
+        bool is_row_hit = dram->row_buffers[bank].valid && (dram->row_buffers[bank].row_id == row_index);
+        bool is_row_miss = dram->row_buffers[bank].valid && (dram->row_buffers[bank].row_id != row_index);
+        bool is_row_empty = !dram->row_buffers[bank].valid;
+
+
+        if (is_row_hit) {
+             /* Row hit: The desired row is already open in the row buffer.
+              * Timing: DELAY_CAS (column access) + DELAY_BUS (data transfer). */
+            delay = DELAY_CAS + DELAY_BUS;
+        }
+
+        if (is_row_empty) {
+             /* Row empty: No row is currently open in the row buffer.
+              * Timing: DELAY_ACT (row activation) + DELAY_CAS (column access) + DELAY_BUS (data transfer). */
+            dram->row_buffers[bank].row_id = row_index;  // Activate the new row.
+            dram->row_buffers[bank].valid = true;
+            delay = DELAY_ACT + DELAY_CAS + DELAY_BUS;
+        }
+
+        if (is_row_miss) {
+            /* Row miss: A different row is currently open in the row buffer.
+             * Timing: DELAY_PRE (precharge current row) + DELAY_ACT (activate new row) +
+             * DELAY_CAS (column access) + DELAY_BUS (data transfer). */
+            /* add the recently accessed row to row-buffer */
+            dram->row_buffers[bank].row_id = row_index;
+            dram->row_buffers[bank].valid = true;
+            delay = DELAY_PRE + DELAY_ACT + DELAY_CAS + DELAY_BUS;
+        }
+
+        if (is_dram_write) {
+            dram->stat_write_access += 1;
+            dram->stat_write_delay += delay;
+        } else {
+            dram->stat_read_access += 1;
+            dram->stat_read_delay += delay;
+        }
+
+        return delay;
+
+
+    }
+
+    return 0;
 }
 
 /**

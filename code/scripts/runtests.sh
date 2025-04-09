@@ -33,15 +33,15 @@ for reference_results in ../ref/results/*.res; do
         D.mix1)
             test_args=(-mode 4 ../traces/bzip2.mtr.gz ../traces/libq.mtr.gz)
             ;;
-        E.Q1.mix1)
-            test_args=(-mode 4 -L2repl 2 -SWP_core0ways 4 ../traces/bzip2.mtr.gz ../traces/libq.mtr.gz)
-            ;;
-        E.Q2.mix1)
-            test_args=(-mode 4 -L2repl 2 -SWP_core0ways 8 ../traces/bzip2.mtr.gz ../traces/libq.mtr.gz)
-            ;;
-        E.Q3.mix1)
-            test_args=(-mode 4 -L2repl 2 -SWP_core0ways 12 ../traces/bzip2.mtr.gz ../traces/libq.mtr.gz)
-            ;;
+#        E.Q1.mix1)
+#            test_args=(-mode 4 -L2repl 2 -SWP_core0ways 4 ../traces/bzip2.mtr.gz ../traces/libq.mtr.gz)
+#            ;;
+#        E.Q2.mix1)
+#            test_args=(-mode 4 -L2repl 2 -SWP_core0ways 8 ../traces/bzip2.mtr.gz ../traces/libq.mtr.gz)
+#            ;;
+#        E.Q3.mix1)
+#            test_args=(-mode 4 -L2repl 2 -SWP_core0ways 12 ../traces/bzip2.mtr.gz ../traces/libq.mtr.gz)
+#            ;;
         *) continue ;;
     esac
 

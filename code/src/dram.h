@@ -13,6 +13,9 @@
 // You may add any other #include directives you need here, but make sure they
 // compile on the reference machine!
 
+/** The number of banks in the DRAM module. */
+#define NUM_BANKS 16
+
 ///////////////////////////////////////////////////////////////////////////////
 //                              DATA STRUCTURES                              //
 ///////////////////////////////////////////////////////////////////////////////
@@ -20,11 +23,26 @@
 // TODO: Define any other data structures you need here.
 // Refer to Appendix B for details on data structures you will need here.
 
+/* A Row-buffer module */
+typedef struct RowBuffer
+{
+    /* valid bit */
+    unsigned int valid;
+
+    /* row id */
+    unsigned int row_id;
+} RowBuffer;
+
 /** A DRAM module. */
 typedef struct DRAM
 {
     // TODO: Define any other fields you need here.
     // Refer to Appendix B for details on other fields you will need here.
+
+    /* array of NUM_BANKS row buffers pointers */
+    RowBuffer row_buffers[NUM_BANKS];
+
+
 
     /**
      * The total number of times DRAM was accessed for a read.
