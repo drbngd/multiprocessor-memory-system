@@ -1,4 +1,4 @@
-SRCS = cache.cpp core.cpp dram.cpp memsys.cpp sim.cpp
+SRCS = cache.cpp core.cpp dram.cpp memsys.cpp sim.cpp tlb.cpp
 OBJS = $(SRCS:.cpp=.o)
 
 CXX = g++

@@ -11,6 +11,7 @@
 #include "types.h"
 #include "cache.h"
 #include "dram.h"
+#include "tlb.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 //                              DATA STRUCTURES                              //
@@ -38,6 +39,13 @@ typedef struct MemorySystem
     Cache *l2cache;
     /** The DRAM module. Used in parts B, C, D, E, and F. */
     DRAM *dram;
+
+    /** The shared instruction TLB. Used in parts D, E, and F. */
+    TLB *itlb;
+    /** The shared data TLB. Used in parts D, E, and F. */
+    TLB *dtlb;
+    /** The shared TLB. Used in parts D, E, and F. */
+    TLB *stlb;
 
     /**
      * The total number of times the memory system was accessed for an
