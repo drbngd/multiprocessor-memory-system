@@ -42,7 +42,11 @@ void tlb_free(TLB *tlb) {
 
 // Helper function to find a TLB entry in a set
 static TLBEntry* find_entry_in_set(TLBSet *set, uint64_t num_ways, uint64_t tag, unsigned int core_id) {
-    for (uint64_t i = 0; i < num_ways; i++) {
+    // Calculate the range of ways this core can access
+    uint64_t start_way = core_id * (num_ways / 2);
+    uint64_t end_way = start_way + (num_ways / 2);
+    
+    for (uint64_t i = start_way; i < end_way; i++) {
         if (set->ways[i].valid && 
             set->ways[i].tag == tag && 
             set->ways[i].core_id == core_id) {
@@ -53,18 +57,22 @@ static TLBEntry* find_entry_in_set(TLBSet *set, uint64_t num_ways, uint64_t tag,
 }
 
 // Helper function to find victim in a set
-static TLBEntry* find_victim_in_set(TLBSet *set, uint64_t num_ways) {
-    TLBEntry *victim = &set->ways[0];
+static TLBEntry* find_victim_in_set(TLBSet *set, uint64_t num_ways, unsigned int core_id) {
+    // Calculate the range of ways this core can access
+    uint64_t start_way = core_id * (num_ways / 2);
+    uint64_t end_way = start_way + (num_ways / 2);
+    
+    TLBEntry *victim = &set->ways[start_way];
     
     // First try to find an invalid entry
-    for (uint64_t i = 0; i < num_ways; i++) {
+    for (uint64_t i = start_way; i < end_way; i++) {
         if (!set->ways[i].valid) {
             return &set->ways[i];
         }
     }
     
-    // If no invalid entry, find LRU
-    for (uint64_t i = 1; i < num_ways; i++) {
+    // If no invalid entry, find LRU within this core's partition
+    for (uint64_t i = start_way + 1; i < end_way; i++) {
         if (set->ways[i].last_access < victim->last_access) {
             victim = &set->ways[i];
         }
@@ -113,7 +121,7 @@ void tlb_install(TLB *tlb, uint64_t vpn, uint64_t pfn, bool is_write, unsigned i
     TLBEntry *entry = find_entry_in_set(set, tlb->num_ways, tag, core_id);
     
     if (!entry) {
-        entry = find_victim_in_set(set, tlb->num_ways);
+        entry = find_victim_in_set(set, tlb->num_ways, core_id);
     }
     
     entry->valid = true;

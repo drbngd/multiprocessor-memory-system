@@ -30,19 +30,19 @@ uint64_t CACHE_LINESIZE = 64;
 ReplacementPolicy REPL_POLICY = LRU;
 
 /** The size of the data cache in bytes. */
-uint64_t DCACHE_SIZE = 32 * 1024;
+uint64_t DCACHE_SIZE = 4 * 32 * 1024;
 
 /** The associativity of the data cache. */
 uint64_t DCACHE_ASSOC = 8;
 
 /** The size of the instruction cache in bytes. */
-uint64_t ICACHE_SIZE = 32 * 1024;
+uint64_t ICACHE_SIZE = 4 * 32 * 1024;
 
 /** The associativity of the instruction cache. */
 uint64_t ICACHE_ASSOC = 8;
 
 /** The size of the L2 cache in bytes. */
-uint64_t L2CACHE_SIZE = 1024 * 1024;
+uint64_t L2CACHE_SIZE = 4 * 1024 * 1024;
 
 /** The associativity of the L2 cache. */
 uint64_t L2CACHE_ASSOC = 16;

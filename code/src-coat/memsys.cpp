@@ -132,9 +132,9 @@ MemorySystem *memsys_new()
         
         // Initialize shared TLBs
         // iTLB: 256 entries, 8-way associative, 4KB page size, shared
-        sys->itlb = tlb_new(256, 8, PAGE_SIZE, true, NUM_CORES);
+        sys->itlb = tlb_new(64, 8, PAGE_SIZE, true, NUM_CORES);
         // dTLB: 1024 entries, 8-way associative, 4KB page size, shared
-        sys->dtlb = tlb_new(1024, 8, PAGE_SIZE, true, NUM_CORES);
+        sys->dtlb = tlb_new(256, 8, PAGE_SIZE, true, NUM_CORES);
         // sTLB: 2048 entries, 8-way associative, 4KB page size, shared
         sys->stlb = tlb_new(2048, 8, PAGE_SIZE, true, NUM_CORES);
     }
@@ -275,9 +275,6 @@ uint64_t memsys_access_modeA(MemorySystem *sys, uint64_t line_addr,
 uint64_t memsys_access_modeBC(MemorySystem *sys, uint64_t line_addr,
                               AccessType type, unsigned int core_id)
 {
-
-    uint64_t delay = 0;
-
     bool needs_icache_access = false;
     bool needs_dcache_access = false;
     bool is_write = false;
@@ -303,36 +300,31 @@ uint64_t memsys_access_modeBC(MemorySystem *sys, uint64_t line_addr,
 
     if (needs_icache_access)
     {
-        delay += ICACHE_HIT_LATENCY;
         CacheResult outcome = cache_access(sys->icache, line_addr, is_write, core_id);
         if (outcome == MISS) {
-            /* access L2 & update delay */
-            delay += memsys_l2_access(sys, line_addr, false, core_id);
+            /* access L2 */
+            memsys_l2_access(sys, line_addr, false, core_id);
             /* bring line in ICACHE */
             cache_install(sys->icache, line_addr, is_write, core_id);
         }
-
     }
 
     if (needs_dcache_access)
     {
-        delay += DCACHE_HIT_LATENCY;
         CacheResult outcome = cache_access(sys->dcache, line_addr, is_write, core_id);
         if (outcome == MISS) {
-            /* access L2 & update delay */
-            delay += memsys_l2_access(sys, line_addr, false, core_id);
+            /* access L2 */
+            memsys_l2_access(sys, line_addr, false, core_id);
 
             /* bring line in DCACHE */
             cache_install(sys->dcache, line_addr, is_write, core_id);
-
-
 
             /* check if evicted line was dirty -> perform writeback */
             if (sys->dcache->last_evicted_line.valid && sys->dcache->last_evicted_line.dirty) {
                 /* get to-be evicted line's addr */
                 uint64_t evicted_line_addr = sys->dcache->last_evicted_line.line_addr;
 
-                /* delay not be calculated for writeback */
+                /* writeback to L2 */
                 memsys_l2_access(sys, evicted_line_addr, true, core_id);
 
                 /* make the data in last evicted line invalid */
@@ -341,7 +333,7 @@ uint64_t memsys_access_modeBC(MemorySystem *sys, uint64_t line_addr,
         }
     }
 
-    return delay;
+    return 0;
 }
 
 /**
@@ -453,6 +445,14 @@ uint64_t memsys_access_modeDEF(MemorySystem *sys, uint64_t v_line_addr,
         tlb_install((type == ACCESS_TYPE_IFETCH) ? sys->itlb : sys->dtlb, 
                    v_full_addr, pfn, (type == ACCESS_TYPE_STORE), core_id);
     }
+    
+    #ifdef TLBCOAT
+    // Add PRINCE cipher delay only if randomization was performed
+    TLB *tlb = (type == ACCESS_TYPE_IFETCH) ? sys->itlb : sys->dtlb;
+    if (tlb->core_states[core_id].miss_counter >= tlb->core_states[core_id].miss_threshold) {
+        // delay += PRINCE_LATENCY;  // Commented out to disable PRINCE cipher delay
+    }
+    #endif
     
     // Calculate physical line address from PFN and page offset
     uint64_t page_offset = v_full_addr % PAGE_SIZE;

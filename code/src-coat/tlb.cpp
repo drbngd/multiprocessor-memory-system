@@ -127,7 +127,7 @@ static uint64_t log2(uint64_t n) {
 TLB* tlb_new(uint64_t num_entries, uint64_t associativity, uint64_t page_size, bool shared, uint64_t num_cores) {
     TLB *tlb = (TLB*)calloc(1, sizeof(TLB));
     
-    tlb->num_sets = num_entries / associativity;
+    tlb->num_sets = num_entries;
     tlb->num_ways = associativity;
     tlb->page_size = page_size;
     tlb->shared = shared;
@@ -237,7 +237,6 @@ TLBResult tlb_access(TLB *tlb, uint64_t vpn, uint64_t *pfn, bool is_write, unsig
     if (tlb->core_states[core_id].miss_counter >= tlb->core_states[core_id].miss_threshold) {
         tlb->core_states[core_id].rid++;  // Simple increment for simulation
         tlb->core_states[core_id].miss_counter = 0;
-        tlb->stat_rerand_count++;
     }
     
     #else
@@ -341,7 +340,4 @@ void tlb_print_stats(TLB *tlb, const char *header) {
     printf("%s_WRITE_ACCESSES \t : %10llu\n", header, tlb->stat_write_access);
     printf("%s_WRITE_MISSES   \t : %10llu\n", header, tlb->stat_write_miss);
     printf("%s_WRITE_HIT_RATE \t : %10.3f\n", header, write_hit_rate);
-    #ifdef TLBCOAT
-    printf("%s_RERAND_COUNT   \t : %10llu\n", header, tlb->stat_rerand_count);
-    #endif
 } 

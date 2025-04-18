@@ -36,7 +36,4 @@ typedef enum ModeEnum
     SIM_MODE_DEF = 4,   // Simulate a multicore system (in parts D, E, and F).
 } Mode;
 
-/** The number of bytes in a page. */
-#define PAGE_SIZE 4096
-
 #endif // __TYPES_H__
