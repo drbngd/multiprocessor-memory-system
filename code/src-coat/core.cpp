@@ -11,21 +11,84 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <string>
+
+// ===== TRACE HANDLING CHANGES START =====
+// ChampSim trace format structure
+struct input_instr {
+    uint64_t ip;
+    unsigned char is_branch;
+    unsigned char branch_taken;
+    unsigned char destination_registers[2];
+    unsigned char source_registers[4];
+    uint64_t destination_memory[2];
+    uint64_t source_memory[4];
+};
+// ===== TRACE HANDLING CHANGES END =====
 
 extern uint64_t current_cycle;
 
 int open_gunzip_pipe(const char *filename, int *fd, pid_t *pid);
 ssize_t trace_read(Core *core, void *buf, size_t size);
 
+// ===== TRACE HANDLING CHANGES START =====
+// Function to open and read ChampSim trace using xz decompression
+int open_champsim_trace(const char *filename, int *fd, pid_t *pid) {
+    int status;
+    int pipefd[2];
+
+    status = pipe(pipefd);
+    if (status != 0) {
+        perror("Couldn't create pipe");
+        return 1;
+    }
+
+    *pid = fork();
+    if (*pid == -1) {
+        perror("Couldn't fork");
+        close(pipefd[0]);
+        close(pipefd[1]);
+        return 1;
+    }
+
+    if (*pid == 0) {
+        // Child process: exec xz
+        dup2(pipefd[1], STDOUT_FILENO);
+        close(pipefd[0]);
+        close(pipefd[1]);
+        execlp("xz", "xz", "-dc", filename, NULL);
+        perror("Couldn't exec xz");
+        return 127;
+    }
+
+    // Parent process: return the read end of the pipe
+    *fd = pipefd[0];
+    close(pipefd[1]);
+    return 0;
+}
+// ===== TRACE HANDLING CHANGES END =====
+
 Core *core_new(MemorySystem *memsys, const char *trace_filename,
                unsigned int core_id)
 {
     int trace_fd;
     pid_t pid;
-    if (open_gunzip_pipe(trace_filename, &trace_fd, &pid) != 0)
-    {
-        return NULL;
+    
+    // ===== TRACE HANDLING CHANGES START =====
+    // Detect trace format based on filename
+    std::string filename(trace_filename);
+    bool is_champsim = filename.find("champsimtrace.xz") != std::string::npos;
+    
+    if (is_champsim) {
+        if (open_champsim_trace(trace_filename, &trace_fd, &pid) != 0) {
+            return NULL;
+        }
+    } else {
+        if (open_gunzip_pipe(trace_filename, &trace_fd, &pid) != 0) {
+            return NULL;
+        }
     }
+    // ===== TRACE HANDLING CHANGES END =====
 
     Core *core = (Core *)calloc(1, sizeof(Core));
     core->core_id = core_id;
@@ -34,6 +97,9 @@ Core *core_new(MemorySystem *memsys, const char *trace_filename,
     core->pid = pid;
     core->read_buf_offset = 0;
     core->read_buf_left = 0;
+    // ===== TRACE HANDLING CHANGES START =====
+    core->is_champsim = is_champsim;
+    // ===== TRACE HANDLING CHANGES END =====
 
     core_read_trace(core);
     return core;
@@ -59,7 +125,7 @@ void core_cycle(Core *core)
     uint64_t bubble_cycles = 0;
 
     ifetch_delay = memsys_access(core->memsys, core->trace_inst_addr,
-                                 ACCESS_TYPE_IFETCH, core->core_id);
+                                 (AccessType)ACCESS_TYPE_IFETCH, core->core_id);
     if (ifetch_delay > 1)
     {
         bubble_cycles += (ifetch_delay - 1);
@@ -68,7 +134,7 @@ void core_cycle(Core *core)
     if (core->trace_inst_type == INST_TYPE_LOAD)
     {
         ld_delay = memsys_access(core->memsys, core->trace_ldst_addr,
-                                 ACCESS_TYPE_LOAD, core->core_id);
+                                 (AccessType)ACCESS_TYPE_LOAD, core->core_id);
     }
     if (ld_delay > 1)
     {
@@ -77,7 +143,7 @@ void core_cycle(Core *core)
 
     if (core->trace_inst_type == INST_TYPE_STORE)
     {
-        memsys_access(core->memsys, core->trace_ldst_addr, ACCESS_TYPE_STORE,
+        memsys_access(core->memsys, core->trace_ldst_addr, (AccessType)ACCESS_TYPE_STORE,
                       core->core_id);
     }
     // We don't incur bubbles for store misses.
@@ -92,25 +158,70 @@ void core_cycle(Core *core)
 
 void core_read_trace(Core *core)
 {
-    uint32_t inst_addr = 0; // initialized to 0 to suppress warning
-    uint8_t inst_type = 0; // initialized to 0 to suppress warning
-    uint32_t ldst_addr = 0; // initialized to 0 to suppress warning
+    // ===== TRACE HANDLING CHANGES START =====
+    if (core->is_champsim) {
+        // Read ChampSim trace format
+        struct input_instr instr;
+        if (read(core->trace_fd, &instr, sizeof(instr)) != sizeof(instr)) {
+            core->done = true;
+            core->done_inst_count = core->inst_count;
+            core->done_cycle_count = current_cycle;
+            return;
+        }
 
-    if (trace_read(core, &inst_addr, sizeof(inst_addr)) !=
-            sizeof(inst_addr) ||
-        trace_read(core, &inst_type, sizeof(inst_type)) !=
-            sizeof(inst_type) ||
-        trace_read(core, &ldst_addr, sizeof(ldst_addr)) !=
-            sizeof(ldst_addr))
-    {
-        core->done = true;
-        core->done_inst_count = core->inst_count;
-        core->done_cycle_count = current_cycle;
+        // Only process Load/Store instructions
+        bool is_load = false;
+        bool is_store = false;
+        uint64_t mem_addr = 0;
+
+        // Check source memory (loads)
+        for (int i = 0; i < 4; i++) {
+            if (instr.source_memory[i] != 0) {
+                is_load = true;
+                mem_addr = instr.source_memory[i];
+                break;
+            }
+        }
+
+        // Check destination memory (stores)
+        if (!is_load) {
+            for (int i = 0; i < 2; i++) {
+                if (instr.destination_memory[i] != 0) {
+                    is_store = true;
+                    mem_addr = instr.destination_memory[i];
+                    break;
+                }
+            }
+        }
+
+        if (is_load || is_store) {
+            core->trace_inst_addr = instr.ip;
+            core->trace_inst_type = is_load ? INST_TYPE_LOAD : INST_TYPE_STORE;
+            core->trace_ldst_addr = mem_addr;
+        } else {
+            // Skip non-memory instructions
+            core_read_trace(core);
+        }
+    } else {
+        // Original trace format
+        uint32_t inst_addr = 0;
+        uint8_t inst_type = 0;
+        uint32_t ldst_addr = 0;
+
+        if (trace_read(core, &inst_addr, sizeof(inst_addr)) != sizeof(inst_addr) ||
+            trace_read(core, &inst_type, sizeof(inst_type)) != sizeof(inst_type) ||
+            trace_read(core, &ldst_addr, sizeof(ldst_addr)) != sizeof(ldst_addr)) {
+            core->done = true;
+            core->done_inst_count = core->inst_count;
+            core->done_cycle_count = current_cycle;
+            return;
+        }
+
+        core->trace_inst_addr = inst_addr;
+        core->trace_inst_type = inst_type;
+        core->trace_ldst_addr = ldst_addr;
     }
-
-    core->trace_inst_addr = inst_addr;
-    core->trace_inst_type = inst_type;
-    core->trace_ldst_addr = ldst_addr;
+    // ===== TRACE HANDLING CHANGES END =====
 }
 
 void core_print_stats(Core *core)
