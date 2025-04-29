@@ -169,34 +169,32 @@ void core_read_trace(Core *core)
             return;
         }
 
-        // Only process Load/Store instructions
-        bool is_load = false;
-        bool is_store = false;
-        uint64_t mem_addr = 0;
-
         // Check source memory (loads)
+        bool has_mem_read = false;
+        bool has_mem_write = false;
+        uint64_t mem_addr = 0;
+        
+        // Check for memory reads in source operands
         for (int i = 0; i < 4; i++) {
             if (instr.source_memory[i] != 0) {
-                is_load = true;
+                has_mem_read = true;
                 mem_addr = instr.source_memory[i];
                 break;
             }
         }
-
-        // Check destination memory (stores)
-        if (!is_load) {
-            for (int i = 0; i < 2; i++) {
-                if (instr.destination_memory[i] != 0) {
-                    is_store = true;
-                    mem_addr = instr.destination_memory[i];
-                    break;
-                }
+        
+        // Check for memory writes in destination operands
+        for (int i = 0; i < 2; i++) {
+            if (instr.destination_memory[i] != 0) {
+                has_mem_write = true;
+                mem_addr = instr.destination_memory[i];
+                break;
             }
         }
 
-        if (is_load || is_store) {
+        if (has_mem_read || has_mem_write) {
             core->trace_inst_addr = instr.ip;
-            core->trace_inst_type = is_load ? INST_TYPE_LOAD : INST_TYPE_STORE;
+            core->trace_inst_type = has_mem_read && !has_mem_write ? INST_TYPE_LOAD : INST_TYPE_STORE;
             core->trace_ldst_addr = mem_addr;
         } else {
             // Skip non-memory instructions

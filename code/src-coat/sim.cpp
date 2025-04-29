@@ -82,6 +82,7 @@ int parse_args(int argc, char **argv);
 void print_dots();
 void print_stats();
 void print_usage(const char *program_name);
+void print_system_config(MemorySystem *memsys, const char *trace_file, uint64_t num_cores);
 
 int main(int argc, char **argv)
 {
@@ -93,6 +94,10 @@ int main(int argc, char **argv)
 
     srand(42);
     memsys = memsys_new();
+    
+    // Print system configuration first
+    print_system_config(memsys, trace_filename[0], NUM_CORES);
+    
     for (unsigned int i = 0; i < NUM_CORES; i++)
     {
         core[i] = core_new(memsys, trace_filename[i], i);
@@ -381,4 +386,36 @@ void print_usage(const char *program_name)
     fprintf(stderr, "    -dram_policy <num>      Set DRAM page policy "
                     "[0: open-page, 1: close-page]\n");
     fprintf(stderr, "                            (default: 0)\n");
+}
+
+void print_system_config(MemorySystem *memsys, const char *trace_file, uint64_t num_cores) {
+    printf("\n=== Memory System ===\n");
+    
+    // Print TLB configuration
+    TLB *itlb = memsys->itlb;  // Using shared ITLB
+    TLB *dtlb = memsys->dtlb;  // Using shared DTLB
+
+    // print TLB type
+    printf("TLB Type: TLBcoat\n");
+    printf("ITLB: entries=%llu, page_size=%lluKB, assoc=%llu-way\n",
+           itlb->num_sets * itlb->num_ways, itlb->page_size / 1024, itlb->num_ways);
+    
+    printf("DTLB: entries=%llu, page_size=%lluKB, assoc=%llu-way\n",
+           dtlb->num_sets * dtlb->num_ways, dtlb->page_size / 1024, dtlb->num_ways);
+    
+    // Print L1 Cache configuration (using first core's cache)
+    Cache *l1 = memsys->dcache_coreid[0];
+    printf("L1 Cache: size=%uKB, line_size=%uB, assoc=%u-way\n",
+           l1->size / 1024, l1->line_size, l1->num_ways);
+    
+    // Print L2 Cache configuration
+    Cache *l2 = memsys->l2cache;
+    printf("L2 Cache: size=%uKB, line_size=%uB, assoc=%u-way\n",
+           l2->size / 1024, l2->line_size, l2->num_ways);
+    
+    printf("\n=== Workload ===\n");
+    printf("Trace: file=\"%s\", cores=%llu, insts=%llu, mem_ops=%llu\n",
+           trace_file, num_cores, 
+           memsys->stat_ifetch_access,
+           memsys->stat_load_access + memsys->stat_store_access);
 }
