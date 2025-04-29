@@ -21,7 +21,7 @@ TLB* tlb_new(uint64_t num_entries, uint64_t associativity, uint64_t page_size, b
     tlb->num_ways = associativity;
     tlb->page_size = page_size;
     tlb->shared = shared;
-    tlb->hit_latency = 1;  // Default hit latency
+    tlb->hit_latency = 0;  // Default hit latency
     tlb->miss_latency = 10; // Default miss latency
     
     // Calculate index bits and mask

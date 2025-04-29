@@ -36,6 +36,18 @@
 /** The hit time of the L2 cache in cycles. */
 #define L2CACHE_HIT_LATENCY 10
 
+/** The hit time of the L1 TLB in cycles. */
+#define L1TLB_HIT_LATENCY 0
+
+/** The miss time of the L1 TLB in cycles. */
+#define L1TLB_MISS_LATENCY 10
+
+/** The hit time of the sTLB in cycles. */
+#define STLB_HIT_LATENCY 0
+
+/** The miss time of the sTLB in cycles. */
+#define STLB_MISS_LATENCY 120
+
 ///////////////////////////////////////////////////////////////////////////////
 //                    EXTERNALLY DEFINED GLOBAL VARIABLES                    //
 ///////////////////////////////////////////////////////////////////////////////
@@ -132,11 +144,11 @@ MemorySystem *memsys_new()
         
         // Initialize shared TLBs
         // iTLB: 256 entries, 8-way associative, 4KB page size, shared
-        sys->itlb = tlb_new(64, 8, PAGE_SIZE, true, NUM_CORES);
+        sys->itlb = tlb_new(4, 4, PAGE_SIZE, true, NUM_CORES);
         // dTLB: 1024 entries, 8-way associative, 4KB page size, shared
-        sys->dtlb = tlb_new(256, 8, PAGE_SIZE, true, NUM_CORES);
+        sys->dtlb = tlb_new(4, 4, PAGE_SIZE, true, NUM_CORES);
         // sTLB: 2048 entries, 8-way associative, 4KB page size, shared
-        sys->stlb = tlb_new(2048, 8, PAGE_SIZE, true, NUM_CORES);
+        sys->stlb = tlb_new(16, 8, PAGE_SIZE, true, NUM_CORES);
     }
 
     return sys;
@@ -430,11 +442,13 @@ uint64_t memsys_access_modeDEF(MemorySystem *sys, uint64_t v_line_addr,
     if (tlb_result == TLB_MISS) {
         // iTLB/dTLB miss - try sTLB
         delay += ((type == ACCESS_TYPE_IFETCH) ? sys->itlb : sys->dtlb)->miss_latency;
+        // delay += 3; // +3 for PRINCE cipher delay
         tlb_result = tlb_access(sys->stlb, v_full_addr, &pfn, (type == ACCESS_TYPE_STORE), core_id);
         
         if (tlb_result == TLB_MISS) {
             // sTLB miss - perform page table walk
-            delay += sys->stlb->miss_latency;
+            // delay += sys->stlb->miss_latency;
+            delay += STLB_MISS_LATENCY;
             pfn = memsys_convert_vpn_to_pfn(sys, v_full_addr / PAGE_SIZE, core_id);
             
             // Install in sTLB
@@ -442,6 +456,7 @@ uint64_t memsys_access_modeDEF(MemorySystem *sys, uint64_t v_line_addr,
         }
         
         // Install in iTLB/dTLB
+        // delay += 3; // +3 for PRINCE cipher delay
         tlb_install((type == ACCESS_TYPE_IFETCH) ? sys->itlb : sys->dtlb, 
                    v_full_addr, pfn, (type == ACCESS_TYPE_STORE), core_id);
     }

@@ -21,7 +21,7 @@ TLB* tlb_new(uint64_t num_entries, uint64_t associativity, uint64_t page_size, b
     tlb->num_ways = associativity;
     tlb->page_size = page_size;
     tlb->shared = shared;
-    tlb->hit_latency = 1;  // Default hit latency
+    tlb->hit_latency = 0;  // Default hit latency
     tlb->miss_latency = 10; // Default miss latency
     
     // Calculate index bits and mask
@@ -42,9 +42,8 @@ void tlb_free(TLB *tlb) {
 
 // Helper function to find a TLB entry in a set
 static TLBEntry* find_entry_in_set(TLBSet *set, uint64_t num_ways, uint64_t tag, unsigned int core_id) {
-    // Calculate the range of ways this core can access
-    uint64_t start_way = core_id * (num_ways / 2);
-    uint64_t end_way = start_way + (num_ways / 2);
+    uint64_t start_way = (core_id == 0) ? 0 : (num_ways / 2);
+    uint64_t end_way = (core_id == 0) ? (num_ways / 2) : num_ways;
     
     for (uint64_t i = start_way; i < end_way; i++) {
         if (set->ways[i].valid && 
@@ -58,9 +57,8 @@ static TLBEntry* find_entry_in_set(TLBSet *set, uint64_t num_ways, uint64_t tag,
 
 // Helper function to find victim in a set
 static TLBEntry* find_victim_in_set(TLBSet *set, uint64_t num_ways, unsigned int core_id) {
-    // Calculate the range of ways this core can access
-    uint64_t start_way = core_id * (num_ways / 2);
-    uint64_t end_way = start_way + (num_ways / 2);
+    uint64_t start_way = (core_id == 0) ? 0 : (num_ways / 2);
+    uint64_t end_way = (core_id == 0) ? (num_ways / 2) : num_ways;
     
     TLBEntry *victim = &set->ways[start_way];
     
@@ -71,7 +69,7 @@ static TLBEntry* find_victim_in_set(TLBSet *set, uint64_t num_ways, unsigned int
         }
     }
     
-    // If no invalid entry, find LRU within this core's partition
+    // If no invalid entry, find LRU
     for (uint64_t i = start_way + 1; i < end_way; i++) {
         if (set->ways[i].last_access < victim->last_access) {
             victim = &set->ways[i];

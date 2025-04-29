@@ -396,7 +396,7 @@ void print_system_config(MemorySystem *memsys, const char *trace_file, uint64_t 
     TLB *dtlb = memsys->dtlb;  // Using shared DTLB
 
     // print TLB type
-    printf("TLB Type: TLBcoat\n");
+    // printf("TLB Type: TLBcoat\n");
     printf("ITLB: entries=%llu, page_size=%lluKB, assoc=%llu-way\n",
            itlb->num_sets * itlb->num_ways, itlb->page_size / 1024, itlb->num_ways);
     

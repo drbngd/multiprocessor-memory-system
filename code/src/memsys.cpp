@@ -132,11 +132,11 @@ MemorySystem *memsys_new()
         
         // Initialize shared TLBs
         // iTLB: 128 entries, 8-way associative, 4KB page size, shared
-        sys->itlb = tlb_new(64, 8, PAGE_SIZE, true);
+        sys->itlb = tlb_new(4, 4, PAGE_SIZE, true);
         // dTLB: 128 entries, 8-way associative, 4KB page size, shared
-        sys->dtlb = tlb_new(256, 8, PAGE_SIZE, true);
+        sys->dtlb = tlb_new(4, 4, PAGE_SIZE, true);
         // sTLB: 256 entries, 8-way associative, 4KB page size, shared
-        sys->stlb = tlb_new(2048, 8, PAGE_SIZE, true);
+        sys->stlb = tlb_new(16, 8, PAGE_SIZE, true);
     }
 
     return sys;

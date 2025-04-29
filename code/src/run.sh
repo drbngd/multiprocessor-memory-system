@@ -13,7 +13,7 @@ for i in "${TRACES[@]}"; do
         
         # Run the simulation
         echo "Running $i + $j..."
-        ./sim -mode 4 "../traces/$i.mtr.gz" "../traces/$j.mtr.gz" > "../ref/results/03.coat.$i.$j"
+        ./sim -mode 4 "../traces/$i.mtr.gz" "../traces/$j.mtr.gz" > "../ref/results/00.norm.$i.$j"
     done
 done
 

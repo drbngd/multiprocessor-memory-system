@@ -7,6 +7,9 @@
 // External variable for current cycle
 extern uint64_t current_cycle;
 
+// Constants
+#define CIPHER_DELAY 1
+
 // PRINCE cipher constants and functions
 #ifdef TLBCOAT
 static const uint8_t PRINCE_SBOX[16] = {0xB, 0xF, 0x3, 0x2, 0xA, 0xC, 0x9, 0x1, 0x6, 0x7, 0x8, 0x0, 0xE, 0x5, 0xD, 0x4};
@@ -83,6 +86,9 @@ void tlb_randomize(TLB *tlb, uint64_t vpn, unsigned int core_id, uint64_t *set_i
     // Use core_id directly as process identifier for randomization
     uint64_t randomization = tlb_prince_encrypt(vpn, 
         tlb->prince_key ^ core_id ^ tlb->core_states[core_id].rid);
+    
+    // Add cipher delay
+    // current_cycle += CIPHER_DELAY;
     
     for(uint64_t i = 0; i < tlb->num_ways; i++) {
         set_indices[i] = (randomization >> (i*4)) & (tlb->num_sets - 1);
@@ -219,6 +225,7 @@ TLBResult tlb_access(TLB *tlb, uint64_t vpn, uint64_t *pfn, bool is_write, unsig
     #ifdef TLBCOAT
     uint64_t set_indices[MAX_WAYS_PER_CACHE_SET];
     tlb_randomize(tlb, vpn, core_id, set_indices);
+    // current_cycle += CIPHER_DELAY;  // Add cipher delay for access
     
     // Check all possible ways
     for (uint64_t i = 0; i < tlb->num_ways; i++) {
@@ -270,6 +277,7 @@ void tlb_install(TLB *tlb, uint64_t vpn, uint64_t pfn, bool is_write, unsigned i
     #ifdef TLBCOAT
     uint64_t set_indices[MAX_WAYS_PER_CACHE_SET];
     tlb_randomize(tlb, vpn, core_id, set_indices);
+    // current_cycle += CIPHER_DELAY;  // Add cipher delay for install
     
     // First try to find an invalid entry
     int64_t victim_way = -1;
