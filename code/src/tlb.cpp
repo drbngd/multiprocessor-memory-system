@@ -127,6 +127,7 @@ void tlb_install(TLB *tlb, uint64_t vpn, uint64_t pfn, bool is_write, unsigned i
 void tlb_print_stats(TLB *tlb, const char *header) {
     double read_hit_rate = 0.0;
     double write_hit_rate = 0.0;
+    double overall_hit_rate = 0.0;
     
     if (tlb->stat_read_access > 0) {
         read_hit_rate = (double)(tlb->stat_read_access - tlb->stat_read_miss) / 
@@ -138,10 +139,18 @@ void tlb_print_stats(TLB *tlb, const char *header) {
                         (double)tlb->stat_write_access;
     }
     
+    // Calculate overall hit rate
+    uint64_t total_access = tlb->stat_read_access + tlb->stat_write_access;
+    uint64_t total_miss = tlb->stat_read_miss + tlb->stat_write_miss;
+    if (total_access > 0) {
+        overall_hit_rate = (double)(total_access - total_miss) / (double)total_access;
+    }
+    
     printf("\n%s_READ_ACCESSES  \t : %10llu\n", header, tlb->stat_read_access);
     printf("%s_READ_MISSES    \t : %10llu\n", header, tlb->stat_read_miss);
     printf("%s_READ_HIT_RATE  \t : %10.3f\n", header, read_hit_rate);
     printf("%s_WRITE_ACCESSES \t : %10llu\n", header, tlb->stat_write_access);
     printf("%s_WRITE_MISSES   \t : %10llu\n", header, tlb->stat_write_miss);
     printf("%s_WRITE_HIT_RATE \t : %10.3f\n", header, write_hit_rate);
+    printf("%s_OVERALL_HIT_RATE \t : %10.3f\n", header, overall_hit_rate);
 } 
