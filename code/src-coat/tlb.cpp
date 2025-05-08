@@ -241,9 +241,12 @@ TLBResult tlb_access(TLB *tlb, uint64_t vpn, uint64_t *pfn, bool is_write, unsig
     
     // Miss - update counter and check for re-randomization
     tlb->core_states[core_id].miss_counter++;
+    tlb->stat_threshold_reached++;  // Increment threshold counter
+    
     if (tlb->core_states[core_id].miss_counter >= tlb->core_states[core_id].miss_threshold) {
-        tlb->core_states[core_id].rid++;  // Simple increment for simulation
+        tlb->core_states[core_id].rid++;  // Increment RID
         tlb->core_states[core_id].miss_counter = 0;
+        tlb->stat_rerandomization_events++;  // Increment re-randomization counter
     }
     
     #else
@@ -357,4 +360,9 @@ void tlb_print_stats(TLB *tlb, const char *header) {
     printf("%s_WRITE_MISSES   \t : %10llu\n", header, tlb->stat_write_miss);
     printf("%s_WRITE_HIT_RATE \t : %10.3f\n", header, write_hit_rate);
     printf("%s_OVERALL_HIT_RATE \t : %10.3f\n", header, overall_hit_rate);
+    
+    #ifdef TLBCOAT
+    printf("%s_THRESHOLD_REACHED \t : %10llu\n", header, tlb->stat_threshold_reached);
+    printf("%s_RERANDOMIZATION_EVENTS \t : %10llu\n", header, tlb->stat_rerandomization_events);
+    #endif
 } 

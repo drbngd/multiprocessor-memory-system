@@ -55,15 +55,17 @@ typedef struct {
     
     TLBSet *sets;               // The TLB sets
     
-    // TLBcoat specific fields
-    uint64_t prince_key;        // Global processor key for PRINCE cipher
-    TLBcoatCoreState *core_states;  // State per core, dynamically allocated
-    
     // Statistics
     uint64_t stat_read_access;   // Number of read accesses
     uint64_t stat_read_miss;     // Number of read misses
     uint64_t stat_write_access;  // Number of write accesses
     uint64_t stat_write_miss;    // Number of write misses
+    uint64_t stat_rerandomization_events;  // New: Counts total re-randomization events
+    uint64_t stat_threshold_reached;       // New: Counts times miss threshold was reached
+    
+    // TLBcoat specific fields
+    uint64_t prince_key;        // Global processor key for PRINCE cipher
+    TLBcoatCoreState *core_states;  // State per core, dynamically allocated
 } TLB;
 
 // Function declarations
